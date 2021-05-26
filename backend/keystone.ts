@@ -2,13 +2,14 @@ import { createAuth } from '@keystone-next/auth';
 import { config, createSchema } from '@keystone-next/keystone/schema';
 import { User } from './schemas/User';
 import 'dotenv/config';
+import { withItemData, statelessSessions, } from '@keystone-next/keystone/session';
 
 const databaseURL =
   process.env.DATABASE_URL || 'mongodb://localhost/keystone-sick-fits-tutorial';
 
 const sessionConfig = {
   maxAge: 60 * 60 * 24 * 360, // How long should they stay signed in?
-  secret: process.env.COOKIE_SECRET,
+  secret: process.env.COOKIE_SECRET || 'secret',
 };
 
 const { withAuth } = createAuth({
@@ -17,30 +18,37 @@ const { withAuth } = createAuth({
   secretField: 'password',
   initFirstItem: {
     fields: ['name', 'email', 'password'],
-    //TODO: add in initial roles here
+    // TODO: add in initial roles here
   },
 });
 
-
-export default withAuth(config({
-  // @ts-ignore
-  server: {
-    cors: {
-      origin: [process.env.FRONTEND_URL],
-      credentials: true,
+export default withAuth(
+  config({
+    // @ts-ignore
+    server: {
+      cors: {
+        origin: [process.env.FRONTEND_URL],
+        credentials: true,
+      },
     },
-  },
-  db: {
-    adapter: 'mongoose',
-    url: databaseURL,
-    // TODO Add data seeding here
-  },
-  lists: createSchema({
-    User,
-  }),
-  ui: {
-    // TODO: change this for roles
-    isAccessAllowed: () => true,
-  },
-  // TODO: add session values here
-}));
+    db: {
+      adapter: 'mongoose',
+      url: databaseURL,
+      // TODO Add data seeding here
+    },
+    lists: createSchema({
+      User,
+    }),
+    ui: {
+      // Show the UI only for people who pass this test
+      isAccessAllowed: ({ session }) => {
+        console.log(session);
+        return !!session?.data;
+      },
+    },
+    session: withItemData(statelessSessions(sessionConfig), {
+      //GraphQL Query
+      User: 'id name email password',
+    }),
+  })
+);
